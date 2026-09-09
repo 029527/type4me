@@ -143,8 +143,7 @@ final class PermissionGuideModel {
         PermissionManager.openAccessibilitySettings()
         isDragOverlayShown = true
         dragOverlay.show(
-            appName: "Type4Me",
-            permissionName: L("辅助功能", "Accessibility")
+            appName: "Type4Me"
         ) { [weak self] in
             Task { @MainActor in
                 guard let self else { return }

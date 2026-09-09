@@ -42,7 +42,7 @@ struct Type4MeApp: App {
 
         Window(L("Type4Me 授权引导", "Type4Me Permissions"), id: "permission-guide") {
             PermissionGuideView(model: appDelegate.permissionGuideModel)
-                .frame(minWidth: 520, idealWidth: 560, minHeight: 460, idealHeight: 480)
+                .frame(minWidth: 600, idealWidth: 600, minHeight: 560, idealHeight: 600)
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)

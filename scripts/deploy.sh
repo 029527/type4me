@@ -16,7 +16,8 @@ Run from an isolated non-iCloud git worktree containing the intended source:
   APP_VERSION=X.Y.Z VARIANT=local bash scripts/deploy.sh
 Builds and verifies the release app and DMG, then backs up and replaces
 /Applications/Type4Me.app. Does not publish to GitHub or reset permissions.
-NOTARY_PROFILE uses build-dmg.sh's default; LAUNCH_APP=0 skips launch.
+NOTARY_PROFILE uses build-dmg.sh's default. NOTARY_KEYCHAIN optionally selects
+a keychain file; otherwise use notarytool's default lookup. LAUNCH_APP=0 skips launch.
 HELP
     exit 0
 fi
@@ -112,7 +113,7 @@ mkdir -p "$DIST_DIR"
 OUTPUT=$(mktemp -d "$DIST_DIR/local-install.XXXXXX")
 APP_FLAVOR=public APP_NAME=Type4Me APP_BUNDLE_ID=com.type4me.app URL_SCHEME=type4me \
 TYPE4ME_DEV_BUILD=0 SKIP_NOTARIZE=0 CODESIGN_IDENTITY="$CODESIGN_IDENTITY" \
-NOTARY_KEYCHAIN="$LOGIN_KEYCHAIN" VARIANT="$VARIANT" ARCH="$ARCH" APP_VERSION="$APP_VERSION" \
+NOTARY_KEYCHAIN="${NOTARY_KEYCHAIN:-}" VARIANT="$VARIANT" ARCH="$ARCH" APP_VERSION="$APP_VERSION" \
 OUT_DIR="$OUTPUT" DMG_NAME=Type4Me-local-install \
 bash "$SCRIPT_DIR/build-dmg.sh"
 BUILT_APP="$OUTPUT/Type4Me.app"

@@ -123,15 +123,23 @@ struct GeneralSettingsTab: View, SettingsCardHelpers {
                 L("系统权限", "Permissions"),
                 icon: "lock.shield.fill",
                 trailing: AnyView(
-                    Button {
-                        checkPermissions()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 11))
-                            .foregroundStyle(TF.settingsTextTertiary)
+                    HStack(spacing: 12) {
+                        Button(L("设置引导", "Setup guide")) {
+                            AppDelegate.presentSetupWizard()
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(TF.settingsTextSecondary)
+                        Button {
+                            checkPermissions()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 11))
+                                .foregroundStyle(TF.settingsTextTertiary)
+                        }
+                        .buttonStyle(.plain)
+                        .settingsTooltip(L("刷新权限状态", "Refresh permission status"))
                     }
-                    .buttonStyle(.plain)
-                    .settingsTooltip(L("刷新权限状态", "Refresh permission status"))
                 )
             ) {
                 permissionRow(
