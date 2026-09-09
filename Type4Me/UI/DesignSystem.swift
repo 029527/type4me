@@ -88,29 +88,32 @@ enum TF {
 
     // MARK: Settings Palette
 
-    // The settings window deliberately uses a quiet, neutral palette.  It keeps
-    // the sidebar visually separate without drawing a hard divider through the
-    // window, and lets the content read as a clean white canvas.
-    static let settingsBg = Color(red: 0.965, green: 0.965, blue: 0.965)
-    static let settingsCard = Color.white
-    static let settingsCardAlt = Color(red: 0.935, green: 0.935, blue: 0.935)
-    static let settingsWindowBackground = Color.white
-    static let settingsSidebar = Color(red: 0.975, green: 0.975, blue: 0.975)
-    static let settingsSidebarActive = Color(red: 0.895, green: 0.895, blue: 0.895)
-    static let settingsSidebarHover = Color(red: 0.935, green: 0.935, blue: 0.935)
-    /// Default, hover, and row-hover fills shared by settings controls.
-    static let settingsControl = Color(red: 241 / 255, green: 241 / 255, blue: 241 / 255)
-    static let settingsControlHover = Color(red: 232 / 255, green: 232 / 255, blue: 232 / 255)
-    static let settingsRowHover = Color(red: 248 / 255, green: 248 / 255, blue: 248 / 255)
-    static let settingsBorder = Color.black.opacity(0.075)
-    static let settingsNavActive = Color(red: 0.10, green: 0.10, blue: 0.10)
-    static let settingsText = Color(red: 0.075, green: 0.075, blue: 0.075)
-    static let settingsTextSecondary = Color(red: 0.30, green: 0.30, blue: 0.30)
-    static let settingsTextTertiary = Color(red: 0.48, green: 0.48, blue: 0.48)
-    static let settingsAccentGreen = Color(red: 0.30, green: 0.62, blue: 0.35)
-    static let settingsAccentAmber = Color(red: 0.78, green: 0.55, blue: 0.15)
-    static let settingsAccentRed = Color(red: 0.80, green: 0.28, blue: 0.22)
-    static let settingsAccentBlue = Color(red: 0.15, green: 0.36, blue: 0.94)
+    // Light values intentionally match the pre-dark-mode palette, including alpha.
+    // Neutral overlays retain their original per-control opacity and compositing.
+    static let settingsInk = adaptiveColor(light: (0, 0, 0), dark: (1, 1, 1))
+    static let settingsFieldText = adaptiveColor(light: (0.10, 0.10, 0.10), dark: (0.94, 0.94, 0.94))
+    static let settingsFieldPlaceholder = adaptiveColor(light: (0.42, 0.42, 0.42), dark: (0.67, 0.67, 0.67))
+    static let settingsFieldCursor = adaptiveColor(light: (0.25, 0.25, 0.25), dark: (0.94, 0.94, 0.94))
+    static let settingsBg = adaptiveColor(light: (0.965, 0.965, 0.965), dark: (0.10, 0.10, 0.10))
+    static let settingsCard = adaptiveColor(light: (1, 1, 1), dark: (0.16, 0.16, 0.16))
+    static let settingsCardAlt = adaptiveColor(light: (0.935, 0.935, 0.935), dark: (0.20, 0.20, 0.20))
+    static let settingsWindowBackground = adaptiveColor(light: (1, 1, 1), dark: (0.12, 0.12, 0.12))
+    static let settingsSidebar = adaptiveColor(light: (0.975, 0.975, 0.975), dark: (0.145, 0.145, 0.145))
+    static let settingsSidebarActive = adaptiveColor(light: (0.895, 0.895, 0.895), dark: (0.27, 0.27, 0.27))
+    static let settingsSidebarHover = adaptiveColor(light: (0.935, 0.935, 0.935), dark: (0.22, 0.22, 0.22))
+    static let settingsControl = adaptiveColor(light: (241 / 255, 241 / 255, 241 / 255), dark: (0.20, 0.20, 0.20))
+    static let settingsControlHover = adaptiveColor(light: (232 / 255, 232 / 255, 232 / 255), dark: (0.26, 0.26, 0.26))
+    static let settingsRowHover = adaptiveColor(light: (248 / 255, 248 / 255, 248 / 255), dark: (0.19, 0.19, 0.19))
+    static let settingsBorder = settingsInk.opacity(0.075)
+    static let settingsNavActive = adaptiveColor(light: (0.10, 0.10, 0.10), dark: (0.92, 0.92, 0.92))
+    static let settingsText = adaptiveColor(light: (0.075, 0.075, 0.075), dark: (0.94, 0.94, 0.94))
+    static let settingsTextSecondary = adaptiveColor(light: (0.30, 0.30, 0.30), dark: (0.78, 0.78, 0.78))
+    static let settingsTextTertiary = adaptiveColor(light: (0.48, 0.48, 0.48), dark: (0.67, 0.67, 0.67))
+    static let settingsOnStrong = adaptiveColor(light: (1, 1, 1), dark: (0.08, 0.08, 0.08))
+    static let settingsAccentGreen = adaptiveColor(light: (0.30, 0.62, 0.35), dark: (0.46, 0.82, 0.51))
+    static let settingsAccentAmber = adaptiveColor(light: (0.78, 0.55, 0.15), dark: (0.94, 0.72, 0.32))
+    static let settingsAccentRed = adaptiveColor(light: (0.80, 0.28, 0.22), dark: (1.0, 0.55, 0.49))
+    static let settingsAccentBlue = adaptiveColor(light: (0.15, 0.36, 0.94), dark: (0.52, 0.72, 1.0))
 
     // MARK: Spacing
 
