@@ -1,6 +1,17 @@
 {
-  "latest": "2.7.0",
+  "latest": "2.7.1",
   "releases": [
+    {
+      "version": "2.7.1",
+      "date": "2026-09-09",
+      "notes": "- 重新设计首次设置与权限引导，统一步骤侧栏、权限卡片和按钮样式，保留欢迎与授权两步流程。\n- 引导、权限恢复及拖拽授权提示与主窗口共享主题，支持浅色、深色和跟随系统。\n- 可在“设置 → 系统权限 → 设置引导”重新查看流程；中英文切换即时生效。\n- 主窗口新增主题选择，并同步优化设置控件及选中文字后的“随便问”窗口在深色下的显示。",
+      "cloud_dmg_url": "https://github.com/joewongjc/type4me/releases/download/v2.7.1/Type4Me-v2.7.1-cloud.dmg",
+      "cloud_dmg_size": 12895005,
+      "cloud_dmg_sha256": "0aae9105bafe575328147b3d71286f0ea196f4c7127ccc9f27adaabab968a815",
+      "local_dmg_url": "https://github.com/joewongjc/type4me/releases/download/v2.7.1/Type4Me-v2.7.1-local-apple-silicon.dmg",
+      "local_dmg_size": 717922317,
+      "local_dmg_sha256": "1ecc28ce3abed15b23a54ef508b9e3840f4f34c5a18bcb7c8bd957761bc979a4"
+    },
     {
       "version": "2.7.0",
       "date": "2026-09-07",
