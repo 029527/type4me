@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings-window appearance. RecordingTheme remains an independent preference.
+/// Appearance preference for standard Type4Me windows. RecordingTheme remains independent.
 enum SettingsTheme: String, CaseIterable, Identifiable {
     case system
     case light
@@ -35,6 +35,14 @@ enum SettingsTheme: String, CaseIterable, Identifiable {
         case .system: language == .zh ? "跟随系统" : "Follow System"
         case .light: language == .zh ? "浅色" : "Light"
         case .dark: language == .zh ? "深色" : "Dark"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .system: "circle.lefthalf.filled"
+        case .light: "sun.max.fill"
+        case .dark: "moon.fill"
         }
     }
 }
