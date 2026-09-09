@@ -55,36 +55,9 @@ final class ClipboardOutputPolicyTests: XCTestCase {
         }
     }
 
-    func testRestoringClipboardDoesNotReportClipboardFallback() {
-        XCTAssertEqual(
-            TextInjectionEngine.finalizeOutcome(
-                .copiedToClipboard,
-                retention: .restoreOriginal
-            ),
-            .notInserted
-        )
-        XCTAssertEqual(
-            TextInjectionEngine.finalizeOutcome(
-                .copiedToClipboard,
-                retention: .retainResult
-            ),
-            .copiedToClipboard
-        )
-    }
-
-    func testBestEffortOpaquePasteNeverRestoresAwayItsFallback() {
-        XCTAssertFalse(TextInjectionEngine.shouldRestoreClipboard(
-            retention: .restoreOriginal,
-            isBestEffortOpaque: true
-        ))
-        XCTAssertTrue(TextInjectionEngine.shouldRestoreClipboard(
-            retention: .restoreOriginal,
-            isBestEffortOpaque: false
-        ))
-        XCTAssertFalse(TextInjectionEngine.shouldRestoreClipboard(
-            retention: .retainResult,
-            isBestEffortOpaque: false
-        ))
+    func testRestorePolicyDeterminesClipboardRestoration() {
+        XCTAssertTrue(TextInjectionEngine.shouldRestoreClipboard(retention: .restoreOriginal))
+        XCTAssertFalse(TextInjectionEngine.shouldRestoreClipboard(retention: .retainResult))
     }
 
     func testLegacyAlwaysCopyMigratesToAlwaysCopy() {
