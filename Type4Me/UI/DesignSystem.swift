@@ -186,6 +186,9 @@ enum TF {
     static let compactTranscriptHorizontalInset: CGFloat = 8
     static let compactTranscriptLeadingFadeWidth: CGFloat = 10
     static let compactIndicatorControlVisualSize: CGFloat = 15
+    /// Width of a compact control's tap lane. The capsule is balanced only when
+    /// the lanes on both edges match, so hiding one control skews the waveform.
+    static let compactIndicatorControlWidth: CGFloat = 32
     static let compactIndicatorWaveBarWidth: CGFloat = 2
     static let compactIndicatorWaveMinHeight: CGFloat = 2
     static let compactIndicatorWaveMaxHeight: CGFloat = 18

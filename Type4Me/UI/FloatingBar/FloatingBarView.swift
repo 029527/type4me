@@ -98,6 +98,7 @@ struct FloatingBarPresentation: Equatable {
     var enablesHoverTranscriptPreview: Bool = true
     var showsTooltips: Bool = true
     var showsCancelButton: Bool = true
+    var showsFinishButton: Bool = true
     var showsModeName: Bool = RecordingMetadataDisplayPreference.showModeNameDefault
     var showsProviderName: Bool = RecordingMetadataDisplayPreference.showProviderNameDefault
     var showsModelName: Bool = RecordingMetadataDisplayPreference.showModelNameDefault
@@ -152,6 +153,7 @@ struct FloatingBarView<S: FloatingBarState>: View {
     @AppStorage("tf_hoverTranscriptPreview") private var hoverTranscriptPreview = true
     @AppStorage(AppearancePreferenceDefaults.showTooltipsKey) private var showTooltips = AppearancePreferenceDefaults.showTooltipsDefault
     @AppStorage(AppearancePreferenceDefaults.showCancelButtonKey) private var showCancelButton = AppearancePreferenceDefaults.showCancelButtonDefault
+    @AppStorage(AppearancePreferenceDefaults.showFinishButtonKey) private var showFinishButton = AppearancePreferenceDefaults.showFinishButtonDefault
     @AppStorage(RecordingVisualStyle.storageKey) private var visualStyle = RecordingVisualStyle.defaultValue
     @AppStorage(RecordingMetadataDisplayPreference.showModeNameKey)
     private var showModeName = RecordingMetadataDisplayPreference.showModeNameDefault
@@ -196,6 +198,13 @@ struct FloatingBarView<S: FloatingBarState>: View {
 
     private var effectiveShowsCancelButton: Bool {
         presentationOverride?.showsCancelButton ?? showCancelButton
+    }
+
+    /// Compact only. The regular bar's finish control is the `LiquidGlassOrb`,
+    /// which is also that style's only audio-level feedback while recording, so
+    /// it is never hidden. The compact capsule draws its waveform separately.
+    private var effectiveShowsCompactFinishButton: Bool {
+        presentationOverride?.showsFinishButton ?? showFinishButton
     }
 
     private var currentRecordingChromeWidth: CGFloat {
@@ -610,15 +619,19 @@ struct FloatingBarView<S: FloatingBarState>: View {
 
     private var compactRecordingControls: some View {
         HStack(spacing: 0) {
-            compactRecordingButton(.finish)
-                .frame(width: 32, height: TF.compactIndicatorHeight)
+            if effectiveShowsCompactFinishButton {
+                compactRecordingButton(.finish)
+                    .frame(width: TF.compactIndicatorControlWidth, height: TF.compactIndicatorHeight)
+            } else {
+                Spacer().frame(width: TF.recordingEdgeInset)
+            }
 
             CompactAudioIndicator(meter: state.audioLevel, theme: effectiveTheme)
                 .frame(maxWidth: .infinity, maxHeight: TF.compactIndicatorHeight)
 
             if effectiveShowsCancelButton {
                 compactRecordingButton(.cancel)
-                    .frame(width: 32, height: TF.compactIndicatorHeight)
+                    .frame(width: TF.compactIndicatorControlWidth, height: TF.compactIndicatorHeight)
             } else {
                 Spacer().frame(width: TF.recordingEdgeInset)
             }

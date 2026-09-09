@@ -70,6 +70,46 @@ final class AppearancePreviewTests: XCTestCase {
         XCTAssertTrue(AppearancePreferenceDefaults.showCancelButtonDefault)
     }
 
+    // MARK: - Optional Record Button
+
+    func testShowFinishButtonPreferenceDefaults() {
+        XCTAssertEqual(AppearancePreferenceDefaults.showFinishButtonKey, "tf_showFinishButton")
+        // Existing users must keep the control until they opt out.
+        XCTAssertTrue(AppearancePreferenceDefaults.showFinishButtonDefault)
+        XCTAssertTrue(FloatingBarPresentation().showsFinishButton)
+    }
+
+    func testFinishAndCancelButtonsHideIndependently() {
+        var presentation = FloatingBarPresentation()
+        presentation.showsFinishButton = false
+        XCTAssertFalse(presentation.showsFinishButton)
+        XCTAssertTrue(presentation.showsCancelButton)
+    }
+
+    /// The compact capsule is balanced only when the lanes on its two edges
+    /// match. With exactly one control visible the waveform sits off-centre —
+    /// which is the reason hiding the stop button exists, rather than saving
+    /// space. Regular is unaffected: its finish control is the metering orb and
+    /// is never hidden.
+    func testCompactWaveformIsCentredOnlyWhenBothEdgesMatch() {
+        func waveformCentreOffset(showsFinish: Bool, showsCancel: Bool) -> CGFloat {
+            let leading = showsFinish ? TF.compactIndicatorControlWidth : TF.recordingEdgeInset
+            let trailing = showsCancel ? TF.compactIndicatorControlWidth : TF.recordingEdgeInset
+            let waveform = TF.compactIndicatorWidth - leading - trailing
+            return (leading + waveform / 2) - TF.compactIndicatorWidth / 2
+        }
+
+        XCTAssertEqual(waveformCentreOffset(showsFinish: true, showsCancel: true), 0)
+        XCTAssertEqual(waveformCentreOffset(showsFinish: false, showsCancel: false), 0)
+
+        // Exactly one control skews the waveform by half the difference between
+        // a control lane and a bare edge inset.
+        let skew = (TF.compactIndicatorControlWidth - TF.recordingEdgeInset) / 2
+        XCTAssertEqual(waveformCentreOffset(showsFinish: true, showsCancel: false), skew)
+        XCTAssertEqual(waveformCentreOffset(showsFinish: false, showsCancel: true), -skew)
+        XCTAssertEqual(skew, 11)
+    }
+
     func testRecordingMetadataDisplayPreferenceDefaults() {
         XCTAssertTrue(RecordingMetadataDisplayPreference.showModeNameDefault)
         XCTAssertFalse(RecordingMetadataDisplayPreference.showProviderNameDefault)
