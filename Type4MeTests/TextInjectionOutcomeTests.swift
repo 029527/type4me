@@ -16,7 +16,7 @@ final class TextInjectionOutcomeTests: XCTestCase {
         )
 
         // 2. Type4Me itself is frontmost (matches selfBundleIdentifier)
-        let currentApp = NSRunningApplication.current
+        let currentApp = StubRunningApplication(bundleIdentifier: "com.type4me.app", isTerminated: false)
         XCTAssertEqual(
             TextInjectionEngine.resolveDeliveryTarget(
                 frontmost: currentApp,
@@ -33,5 +33,29 @@ final class TextInjectionOutcomeTests: XCTestCase {
             ),
             .app(currentApp)
         )
+
+        // 4. A terminated app cannot receive the result.
+        let terminatedApp = StubRunningApplication(bundleIdentifier: "com.editor.app", isTerminated: true)
+        XCTAssertEqual(
+            TextInjectionEngine.resolveDeliveryTarget(
+                frontmost: terminatedApp,
+                selfBundleIdentifier: "com.type4me.app"
+            ),
+            .fallbackToClipboard
+        )
     }
+}
+
+private final class StubRunningApplication: NSRunningApplication {
+    private let testBundleIdentifier: String
+    private let testIsTerminated: Bool
+
+    init(bundleIdentifier: String, isTerminated: Bool) {
+        testBundleIdentifier = bundleIdentifier
+        testIsTerminated = isTerminated
+        super.init()
+    }
+
+    override var bundleIdentifier: String? { testBundleIdentifier }
+    override var isTerminated: Bool { testIsTerminated }
 }
