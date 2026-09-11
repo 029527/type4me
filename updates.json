@@ -1,6 +1,17 @@
 {
-  "latest": "2.7.1",
+  "latest": "2.8.0",
   "releases": [
+    {
+      "version": "2.8.0",
+      "date": "2026-09-11",
+      "notes": "### 新功能\n\n- **当前键盘焦点输入**：手动听写、菜单栏和手动输入窗口会把结果直接粘贴到结束时当前接收键盘事件的位置，兼容自定义渲染编辑器、终端等不完整支持 Accessibility 的应用；URL Scheme 自动化和语音改口继续使用各自的安全目标机制。\n- **紧凑录音条可隐藏停止按钮**：使用快捷键结束录音时，可在外观设置中隐藏紧凑录音条的停止按钮；两侧控件同时隐藏后，波形保持居中并获得更宽的显示空间。\n\n### 改进与修复\n\n- **浅色录音条可读性**：浅色 Liquid Glass 覆盖深色网页、编辑器或壁纸时，文字、波形和纠错提示保持清晰；亮色主题切换会即时应用到纠错提示面板。\n- **火山引擎错误提示**：配额、鉴权和限流等服务端错误会直接显示在录音和“测试连接”中，不再静默结束或被重试提示覆盖。",
+      "cloud_dmg_url": "https://github.com/joewongjc/type4me/releases/download/v2.8.0/Type4Me-v2.8.0-cloud.dmg",
+      "cloud_dmg_size": 12839308,
+      "cloud_dmg_sha256": "54a947c9951d09438874e4df38fc45a565ad33a89e496703a51907ff17615e33",
+      "local_dmg_url": "https://github.com/joewongjc/type4me/releases/download/v2.8.0/Type4Me-v2.8.0-local-apple-silicon.dmg",
+      "local_dmg_size": 717890326,
+      "local_dmg_sha256": "20436f43c55565274e10d3fa5ec5431b510d351bd9e936873f74b75c2703ad64"
+    },
     {
       "version": "2.7.1",
       "date": "2026-09-09",
