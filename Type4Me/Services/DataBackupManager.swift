@@ -34,16 +34,11 @@ enum DataBackupManager {
 
     // MARK: - Locations
 
-    private static var appSupport: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-    }
+    static var dataDirectory: URL { AppDataLocation.directory }
 
-    static var dataDirectory: URL { appSupport.appendingPathComponent("Type4Me", isDirectory: true) }
-
-    /// A sibling of the data directory, not a child of it.
-    static var backupRoot: URL {
-        appSupport.appendingPathComponent("Type4Me Backups", isDirectory: true)
-    }
+    /// A sibling of the data directory, not a child of it. Follows the same
+    /// per-build naming, so a Dev build never rotates the production backups.
+    static var backupRoot: URL { AppDataLocation.backupDirectory }
 
     // MARK: - Entry point
 
