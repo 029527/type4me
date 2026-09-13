@@ -7,13 +7,14 @@ import AppKit
 /// Rotating local snapshots of the user's data, so an unexplained loss is
 /// recoverable without the user having set anything up in advance (#302).
 ///
-/// Snapshots are written **outside** the data directory. A backup kept inside
-/// it would be taken by the same loss it exists to survive.
+/// Snapshots are written beside the data directory rather than inside it: a
+/// backup kept inside would certainly be taken by the same loss. A sibling is
+/// only a better bet, not a guarantee — nothing here proves a real failure could
+/// not take the whole of Application Support.
 enum DataBackupManager {
 
-    /// Files worth keeping. Deliberately excludes `debug.log`, SQLite sidecars
-    /// (`-wal` / `-shm`, which are captured by the database snapshot itself) and
-    /// `Updates/`, none of which carry user data.
+    /// Every file the stores persist as user data. Kept as an explicit list so
+    /// adding a store is a visible decision about whether it is worth backing up.
     static let backedUpFiles = [
         "history.db",
         "ask-anything.db",
@@ -25,12 +26,31 @@ enum DataBackupManager {
         "hotwords.txt",
         "credentials.json",
         "intelli-sense-settings.json",
+        "intelli-sense-expression-profile.json",
+        "revise-settings.json",
+        "batch-correction-suggestions-v1.json",
+        "jieba-user-dictionary-v1.utf8",
     ]
+
+    /// Directories copied whole. `app-snippets/` holds per-app replacement rules
+    /// and their registry.
+    static let backedUpDirectories = ["app-snippets"]
+
+    // Deliberately excluded: `models/` (large and re-downloadable), `Sounds/`
+    // (a fallback lookup for bundled sounds), `debug.log*`, `Updates/` and
+    // `server-pids.txt` (runtime state), and the SQLite `-wal` / `-shm`
+    // sidecars, whose committed contents `VACUUM INTO` folds into the copy.
 
     static let retainedSnapshots = 7
     static let minimumInterval: TimeInterval = 24 * 60 * 60
 
+    /// Staging older than this is assumed to belong to a run that crashed.
+    static let staleStagingAge: TimeInterval = 60 * 60
+
     private static let lastRunKey = "tf_lastDataBackupAt"
+    private static let fingerprintFileName = ".fingerprint"
+    private static let stagingPrefix = ".in-progress-"
+    private static let snapshotNamePattern = #"^\d{8}-\d{6}$"#
 
     // MARK: - Locations
 
@@ -53,23 +73,32 @@ enum DataBackupManager {
         defaults: UserDefaults = .standard
     ) {
         guard isDue(now: now, defaults: defaults) else { return }
-        guard let snapshot = try? snapshot(now: now) else { return }
-        defaults.set(now.timeIntervalSince1970, forKey: lastRunKey)
-        _ = snapshot
-        prune()
+        do {
+            try snapshot(now: now)
+            // Recorded whether or not anything changed: today's question of
+            // "is there a current snapshot" has been answered either way.
+            defaults.set(now.timeIntervalSince1970, forKey: lastRunKey)
+            prune()
+        } catch {
+            // The timestamp is left alone so the next launch tries again.
+            DebugFileLogger.log("data backup failed: \(error)")
+        }
     }
 
     static func isDue(now: Date, defaults: UserDefaults) -> Bool {
-        let last = defaults.object(forKey: lastRunKey) as? TimeInterval
-        guard let last else { return true }
+        guard let last = defaults.object(forKey: lastRunKey) as? TimeInterval else { return true }
         return now.timeIntervalSince1970 - last >= minimumInterval
     }
 
     // MARK: - Snapshot
 
-    /// Writes a snapshot, or returns nil when the data is identical to the
-    /// newest existing one. Re-copying unchanged data would evict older
-    /// snapshots through rotation and shrink the window we can recover from.
+    /// Writes a snapshot, or returns nil when nothing has changed since the
+    /// newest one. Re-copying unchanged data would evict older snapshots through
+    /// rotation and shrink the window recovery is possible from.
+    ///
+    /// The snapshot is assembled in a hidden staging directory and renamed into
+    /// place only once every item and the fingerprint are written, so a failure
+    /// part-way through can never leave something that counts as a snapshot.
     @discardableResult
     static func snapshot(
         now: Date = Date(),
@@ -78,38 +107,53 @@ enum DataBackupManager {
     ) throws -> URL? {
         let source = source ?? dataDirectory
         let root = root ?? backupRoot
-        let sources = backedUpFiles
-            .map { source.appendingPathComponent($0) }
-            .filter { FileManager.default.fileExists(atPath: $0.path) }
-        guard !sources.isEmpty else { return nil }
+        removeStaleStaging(in: root)
 
-        let fingerprint = fingerprint(of: sources)
-        if let newest = snapshots(in: root).last,
-           (try? String(contentsOf: newest.appendingPathComponent(".fingerprint"), encoding: .utf8))
-            == fingerprint {
+        let files = backedUpFiles
+            .map { source.appendingPathComponent($0) }
+            .filter { isDirectory($0) == false }
+        let directories = backedUpDirectories
+            .map { source.appendingPathComponent($0, isDirectory: true) }
+            .filter { isDirectory($0) == true }
+        let items = files + directories
+        guard !items.isEmpty else { return nil }
+
+        let fingerprint = fingerprint(of: items)
+        if let newest = snapshots(in: root).last, storedFingerprint(of: newest) == fingerprint {
             return nil
         }
 
-        let destination = root.appendingPathComponent(Self.name(for: now), isDirectory: true)
-        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-
-        for source in sources {
-            let target = destination.appendingPathComponent(source.lastPathComponent)
-            if source.pathExtension == "db" {
-                // A live SQLite database cannot be copied byte-for-byte: writes
-                // may be sitting in the write-ahead log. `VACUUM INTO` asks
-                // SQLite for a consistent copy instead.
-                try copyDatabase(from: source, to: target)
-            } else {
-                try FileManager.default.copyItem(at: source, to: target)
-            }
+        let destination = root.appendingPathComponent(name(for: now), isDirectory: true)
+        guard !FileManager.default.fileExists(atPath: destination.path) else {
+            throw BackupError.snapshotAlreadyExists(destination.lastPathComponent)
         }
 
-        try fingerprint.write(
-            to: destination.appendingPathComponent(".fingerprint"),
-            atomically: true,
-            encoding: .utf8
-        )
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let staging = root.appendingPathComponent(stagingPrefix + UUID().uuidString, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+            for item in items {
+                let target = staging.appendingPathComponent(item.lastPathComponent)
+                if item.pathExtension == "db" {
+                    // A live SQLite database cannot be copied byte-for-byte:
+                    // committed writes may still be in the write-ahead log.
+                    // `VACUUM INTO` asks SQLite for a consistent copy instead.
+                    try copyDatabase(from: item, to: target)
+                } else {
+                    try FileManager.default.copyItem(at: item, to: target)
+                }
+            }
+            // Written last: its presence is what marks a snapshot as complete.
+            try fingerprint.write(
+                to: staging.appendingPathComponent(fingerprintFileName),
+                atomically: true,
+                encoding: .utf8
+            )
+            try FileManager.default.moveItem(at: staging, to: destination)
+        } catch {
+            try? FileManager.default.removeItem(at: staging)
+            throw error
+        }
         return destination
     }
 
@@ -129,9 +173,24 @@ enum DataBackupManager {
         }
     }
 
+    /// Staging left by a crash is invisible to `snapshots()` but still occupies
+    /// disk. Only old staging is removed, so a snapshot another process is
+    /// writing right now is left alone.
+    static func removeStaleStaging(in root: URL) {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
+        for name in names where name.hasPrefix(stagingPrefix) {
+            let url = root.appendingPathComponent(name)
+            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+            guard let modified = attributes?[.modificationDate] as? Date,
+                  Date().timeIntervalSince(modified) > staleStagingAge
+            else { continue }
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
     // MARK: - Rotation
 
-    /// Snapshot directories, oldest first. Names sort chronologically.
+    /// Complete snapshots, oldest first. Names sort chronologically.
     static func snapshots(in root: URL? = nil) -> [URL] {
         let root = root ?? backupRoot
         let entries = (try? FileManager.default.contentsOfDirectory(
@@ -140,8 +199,20 @@ enum DataBackupManager {
             options: [.skipsHiddenFiles]
         )) ?? []
         return entries
-            .filter { $0.hasDirectoryPath }
+            .filter(isSnapshot)
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    /// A directory counts only with the expected name and a fingerprint.
+    /// Anything else is an interrupted write or not ours, and must neither be
+    /// shown as the latest backup nor take a rotation slot from a real one.
+    static func isSnapshot(_ url: URL) -> Bool {
+        guard isDirectory(url) == true,
+              url.lastPathComponent.range(of: snapshotNamePattern, options: .regularExpression) != nil
+        else { return false }
+        return FileManager.default.fileExists(
+            atPath: url.appendingPathComponent(fingerprintFileName).path
+        )
     }
 
     @discardableResult
@@ -166,37 +237,77 @@ enum DataBackupManager {
         #endif
     }
 
-    // MARK: - Helpers
+    // MARK: - Naming
 
     static func name(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return formatter.string(from: date)
+        snapshotNameFormatter().string(from: date)
     }
 
     /// Inverse of `name(for:)`, for showing when the newest snapshot was taken.
     static func date(fromSnapshotName name: String) -> Date? {
+        snapshotNameFormatter().date(from: name)
+    }
+
+    private static func snapshotNameFormatter() -> DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return formatter.date(from: name)
+        return formatter
     }
 
-    /// Size and modification date per file. Cheap, and enough to notice the
-    /// edits this is meant to protect; it is not a content hash.
+    // MARK: - Change detection
+
+    /// Size and modification time per item — not a content hash, but enough to
+    /// notice the edits this protects.
+    ///
+    /// A database also reports its write-ahead log. Committed changes can live
+    /// only there, leaving the main file's size and timestamp untouched, and
+    /// would otherwise be mistaken for no change at all.
     static func fingerprint(of urls: [URL]) -> String {
-        urls.sorted { $0.lastPathComponent < $1.lastPathComponent }.map { url in
-            let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
-            let size = (attrs?[.size] as? NSNumber)?.intValue ?? -1
-            let modified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? -1
-            return "\(url.lastPathComponent):\(size):\(Int(modified))"
-        }.joined(separator: "\n")
+        urls.flatMap(signatureLines(for:)).sorted().joined(separator: "\n")
+    }
+
+    private static func signatureLines(for url: URL) -> [String] {
+        if isDirectory(url) == true {
+            let subpaths = (try? FileManager.default.subpathsOfDirectory(atPath: url.path)) ?? []
+            let lines = subpaths.compactMap { subpath -> String? in
+                let child = url.appendingPathComponent(subpath)
+                guard isDirectory(child) == false else { return nil }
+                return signatureLine(label: "\(url.lastPathComponent)/\(subpath)", for: child)
+            }
+            return lines.isEmpty ? ["\(url.lastPathComponent)/:empty"] : lines
+        }
+
+        var lines = [signatureLine(label: url.lastPathComponent, for: url)]
+        if url.pathExtension == "db" {
+            let wal = URL(fileURLWithPath: url.path + "-wal")
+            lines.append(signatureLine(label: wal.lastPathComponent, for: wal))
+        }
+        return lines
+    }
+
+    private static func signatureLine(label: String, for url: URL) -> String {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+            return "\(label):absent"
+        }
+        let size = (attributes[.size] as? NSNumber)?.int64Value ?? -1
+        let modified = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? -1
+        return "\(label):\(size):\(String(format: "%.6f", modified))"
+    }
+
+    private static func storedFingerprint(of snapshot: URL) -> String? {
+        try? String(contentsOf: snapshot.appendingPathComponent(fingerprintFileName), encoding: .utf8)
+    }
+
+    private static func isDirectory(_ url: URL) -> Bool? {
+        var flag: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &flag) else { return nil }
+        return flag.boolValue
     }
 
     enum BackupError: Error, Equatable {
         case databaseUnreadable(String)
+        case snapshotAlreadyExists(String)
     }
 }
