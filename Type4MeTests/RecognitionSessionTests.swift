@@ -319,4 +319,80 @@ final class RecognitionSessionTests: XCTestCase {
         XCTAssertEqual(result.displayText, "前半句后半句")
     }
 
+    func testRecordingTimeTranscriptUpdatesDoNotScheduleOrTriggerLLM() async throws {
+        let session = RecognitionSession()
+        let mockClient = MockLLMProcessCounter()
+        await session.setInjectedLLMClientForTesting(mockClient)
+        await session.setState(.recording)
+
+        // Emitting multiple streaming transcript events during recording
+        await session.ingestASREventForTesting(.transcript(RecognitionTranscript(
+            confirmedSegments: ["今天天气"],
+            partialText: "真不错",
+            authoritativeText: "",
+            isFinal: false
+        )))
+        await session.ingestASREventForTesting(.transcript(RecognitionTranscript(
+            confirmedSegments: ["今天天气真不错"],
+            partialText: "我们出去走走",
+            authoritativeText: "",
+            isFinal: false
+        )))
+
+        // Wait beyond old speculative debounce duration (800ms) to prove no background call is fired
+        try await Task.sleep(for: .milliseconds(900))
+
+        let processCalls = await mockClient.processCallCount
+        XCTAssertEqual(processCalls, 0, "No LLM process call should be scheduled or triggered during recording")
+        let state = await session.state
+        XCTAssertEqual(state, .recording)
+        await session.setState(.idle)
+    }
+
+    func testResolveEffectiveTranscriptFeedsBatchFallbackResultToFinalPipeline() {
+        // Given a streaming session that failed with only a partial transcript
+        let partialTranscript = RecognitionTranscript(
+            confirmedSegments: [],
+            partialText: "明天下午开",
+            authoritativeText: "",
+            isFinal: false
+        )
+
+        // And batch fallback recovers the full text
+        let batchFallbackText = "明天下午开会讨论报价"
+        let recoveredTranscript = RecognitionTranscript(
+            confirmedSegments: [batchFallbackText],
+            partialText: "",
+            authoritativeText: batchFallbackText,
+            isFinal: true
+        )
+
+        // resolveEffectiveTranscript preserves the authoritative recovered text
+        let effective = RecognitionSession.resolveEffectiveTranscript(
+            currentTranscript: recoveredTranscript,
+            providerIsStreaming: true
+        )
+
+        XCTAssertEqual(effective.displayText, batchFallbackText)
+        XCTAssertNotEqual(effective.displayText, partialTranscript.displayText)
+    }
+}
+
+private actor MockLLMProcessCounter: LLMClient {
+    private(set) var processCallCount = 0
+    private(set) var lastProcessedText: String?
+
+    func process(
+        text: String,
+        prompt: String,
+        config: LLMConfig,
+        inputBoundary: LLMInputBoundary
+    ) async throws -> String {
+        processCallCount += 1
+        lastProcessedText = text
+        return text
+    }
+
+    func warmUp(baseURL: String) async {}
+    func invalidate() async {}
 }
