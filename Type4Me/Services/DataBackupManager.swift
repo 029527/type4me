@@ -70,24 +70,34 @@ enum DataBackupManager {
     /// Takes a snapshot if one is due and the data has changed since the last.
     static func runIfNeeded(
         now: Date = Date(),
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        source: URL? = nil,
+        root: URL? = nil
     ) {
         guard isDue(now: now, defaults: defaults) else { return }
         do {
-            try snapshot(now: now)
+            try snapshot(now: now, from: source, root: root)
             // Recorded whether or not anything changed: today's question of
             // "is there a current snapshot" has been answered either way.
             defaults.set(now.timeIntervalSince1970, forKey: lastRunKey)
-            prune()
+            prune(root: root)
         } catch {
-            // The timestamp is left alone so the next launch tries again.
+            // The timestamp is left alone so the scheduler's next check retries.
             DebugFileLogger.log("data backup failed: \(error)")
         }
     }
 
     static func isDue(now: Date, defaults: UserDefaults) -> Bool {
-        guard let last = defaults.object(forKey: lastRunKey) as? TimeInterval else { return true }
-        return now.timeIntervalSince1970 - last >= minimumInterval
+        guard let last = lastRun(defaults: defaults) else { return true }
+        // A timestamp from the future means the clock was moved backwards.
+        // Trusting it would suspend backups until real time caught up with it,
+        // which could be months.
+        if now < last { return true }
+        return now.timeIntervalSince(last) >= minimumInterval
+    }
+
+    static func lastRun(defaults: UserDefaults = .standard) -> Date? {
+        (defaults.object(forKey: lastRunKey) as? TimeInterval).map(Date.init(timeIntervalSince1970:))
     }
 
     // MARK: - Snapshot
