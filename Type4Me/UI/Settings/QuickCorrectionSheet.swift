@@ -5,10 +5,8 @@ struct QuickCorrectionSheet: View {
     /// The recogniser's own output. Corrections are built from this, because a
     /// replacement rule is matched against what the recogniser produced.
     let text: String
-    /// What the record actually delivered. When it differs from `text`, a
-    /// replacement rule rewrote the output, and the characters below will not
-    /// match what the history list showed.
-    var finalText: String?
+    /// Why the delivered text differs from `text`, for a history record.
+    var provenance: CorrectionProvenance?
     var onComplete: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
@@ -32,61 +30,79 @@ struct QuickCorrectionSheet: View {
         !correctText.trimmingCharacters(in: .whitespaces).isEmpty && !selectedChars.isEmpty
     }
 
-    /// Non-nil only when the delivered output was rewritten after recognition.
-    private var rewrittenOutput: String? {
-        guard let finalText, !finalText.isEmpty, finalText != text else { return nil }
-        return finalText
+    @AppStorage("tf_language") private var language = AppLanguage.systemDefault
+
+    /// Read through the stored value so switching languages re-renders the sheet.
+    private var currentLanguage: AppLanguage {
+        AppLanguage(rawValue: language) ?? AppLanguage.current
     }
 
-    private var appliedRules: [(trigger: String, value: String)] {
-        rewrittenOutput == nil ? [] : SnippetStorage.rulesApplied(to: text)
-    }
-
-    private func openRule(_ rule: (trigger: String, value: String)) {
+    private func openRule(_ rule: AppliedSnippetRule) {
         dismiss()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             VocabularyNavigationCenter.shared.submit(
                 VocabularyNavigationRequest(
                     section: .snippets,
                     trigger: rule.trigger,
-                    replacement: rule.value
+                    replacement: rule.value,
+                    scopeBundleId: rule.bundleId,
+                    revealExisting: true
                 )
             )
         }
     }
 
-    /// Explains the mismatch between the characters below and the text the
-    /// history list showed, and points at the rule that caused it.
+    private func ruleStillExists(_ rule: AppliedSnippetRule) -> Bool {
+        let current = rule.bundleId.map { SnippetStorage.loadAppSnippets(bundleId: $0) } ?? SnippetStorage.load()
+        return CorrectionProvenance.ruleStillExists(rule, in: current)
+    }
+
+    private func scopeLabel(for rule: AppliedSnippetRule) -> String {
+        let appName = rule.bundleId.flatMap { id in
+            SnippetStorage.loadRegistry().first(where: { $0.bundleId == id })?.name
+        }
+        return CorrectionProvenance.scopeLabel(bundleId: rule.bundleId, appName: appName, language: currentLanguage)
+    }
+
+    /// Explains why the characters below differ from the history list, using only
+    /// what the record captured when it was produced.
     @ViewBuilder
     private var rewriteNotice: some View {
-        if let rewritten = rewrittenOutput {
+        if let provenance, let message = provenance.message(language: currentLanguage) {
             VStack(alignment: .leading, spacing: TF.spacingXS) {
-                Text(L(
-                    "这条记录的输出被替换规则改写过，下方是原始识别结果。",
-                    "This record's output was rewritten by a replacement rule. The characters below are the original recognition."
-                ))
-                .font(.system(size: 11))
-                .foregroundStyle(TF.settingsTextSecondary)
+                Text(message)
+                    .font(.system(size: 11))
+                    .foregroundStyle(TF.settingsTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 HStack(alignment: .firstTextBaseline, spacing: TF.spacingXS) {
                     Text(L("实际输出", "Delivered"))
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(TF.settingsTextTertiary)
-                    Text(rewritten)
+                    Text(provenance.deliveredText)
                         .font(.system(size: 11))
                         .foregroundStyle(TF.settingsText)
                         .textSelection(.enabled)
                 }
 
-                ForEach(appliedRules, id: \.trigger) { rule in
+                ForEach(Array(provenance.appliedRules.enumerated()), id: \.offset) { _, rule in
                     HStack(spacing: TF.spacingXS) {
                         Text("\(rule.trigger) → \(rule.value)")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(TF.settingsText)
-                        Button(L("查看规则", "Open rule")) { openRule(rule) }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(TF.settingsAccentBlue)
+                        Text(scopeLabel(for: rule))
+                            .font(.system(size: 10))
+                            .foregroundStyle(TF.settingsTextTertiary)
+                        if ruleStillExists(rule) {
+                            Button(L("查看规则", "Open rule")) { openRule(rule) }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(TF.settingsAccentBlue)
+                        } else {
+                            Text(L("规则已修改或删除", "Rule since changed or removed"))
+                                .font(.system(size: 10))
+                                .foregroundStyle(TF.settingsTextTertiary)
+                        }
                     }
                 }
             }
